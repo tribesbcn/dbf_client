@@ -1,0 +1,13 @@
+name = DBF Client
+description = Creates a module to import DBF information from external software to Drupal system.
+package = TRT Development
+core = 7.x
+
+dependencies[] = entity
+dependencies[] = views
+dependencies[] = client_service_update
+
+files[] = dbf_client.module
+files[] = dbf_client.install
+
+files[] = dbf_client.controller.inc

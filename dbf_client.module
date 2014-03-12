@@ -1,0 +1,731 @@
+<?php
+
+/**
+ * Implements hook_entity_info().
+ */
+function dbf_client_entity_info() {
+  $return = array(
+    'dbf_client' => array(
+      'label' => t('DBF Client'),
+      'entity class' => 'DBFClient',
+      'controller class' => 'DBFClientController',
+      'base table' => 'dbf_client',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'CCODCLI',
+        'bundle' => 'type',
+      ),
+      'bundle keys' => array(
+        'bundle' => 'type',
+      ),
+      'bundles' => array(),
+      'load hook' => 'dbf_client_load',
+      'views controller class' => 'DBFClientViewsController',
+      'view modes' => array(
+        'full' => array(
+          'label' => t('Default'),
+          'custom settings' => FALSE,
+        ),
+      ),
+      'label callback' => 'entity_class_label',
+      'uri callback' => 'entity_class_uri',
+      'module' => 'dbf_client',
+      'access callback' => 'dbf_client_access',
+    ),
+  );
+  $return['dbf_client_type'] = array(
+    'label' => t('DBF Client Type'),
+    'entity class' => 'DBFClientType',
+    'controller class' => 'DBFClientTypeController',
+    'base table' => 'dbf_client_type',
+    'fieldable' => FALSE,
+    'bundle of' => 'dbf_client',
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'module' => 'dbf_client',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/structure/dbfclient-types',
+      'file' => 'dbf_client.admin.inc',
+      'controller class' => 'DBFClientTypeUIController',
+    ),
+    'access callback' => 'dbf_client_type_access',
+  );
+
+  return $return;
+}
+
+/**
+ * Implements hook_entity_info_alter().
+ */
+function dbf_client_entity_info_alter(&$entity_info) {
+  foreach (dbf_client_types() as $type => $info) {
+    $entity_info['dbf_client']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/dbfclient-types/manage/%dbf_client_type',
+        'real path' => 'admin/structure/dbfclient-types/manage/' . $type,
+        'bundle argument' => 4,
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_cron().
+ */
+function dbf_client_cron(){
+  if (!lock_acquire('dbf_client_locker', 5000.0)) {
+    // Wait for another request that is already doing this work.
+    watchdog('dbf_client', 'Function DBF Client Tasks is executing', array(), WATCHDOG_INFO);
+    lock_wait('dbf_client_locker');
+    return FALSE;
+  }
+  
+  try{
+    watchdog('dbf_client', 'Cron DBF Client Entity Tasks executed!', array(), WATCHDOG_INFO);
+  }catch(Exception $e){
+    watchdog('dbf_client', 'Cron DBF Client Tasks failed: %error_message', array('%error_message' => $e->getMessage()), WATCHDOG_ERROR);
+  }
+  lock_release('dbf_client_locker');
+}
+
+/**
+ * Implements hook_menu().
+ */
+function dbf_client_menu() {
+  $items = array();
+  
+  $items['dbf_client/autocomplete'] = array(
+    'title' => 'DBF Client autocomplete',
+    'page callback' => 'dbf_client_autocomplete_list',
+    'access arguments' => array('administer dbf_client entities'),
+    'type' => MENU_CALLBACK,
+  );
+  
+  // *** MENU OPTIONS FOR ENTITY ADMINISTRATION ***
+  $items['dbf_client/add'] = array(
+    'title' => 'Add DBF Client Entity',
+    'page callback' => 'dbf_client_admin_add_page',
+    'access arguments' => array('administer dbf_client entities'),
+    'file' => 'dbf_client.admin.inc',
+    'type' => MENU_LOCAL_ACTION,
+    'tab_parent' => 'clients',
+    'tab_root' => 'clients',
+    'weight' => 1,
+  );
+  $items['dbf_client/import_dbf'] = array(
+    'title' => 'Import DBF Clients',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dbf_client_admin_import_dbf_form'),
+    'access arguments' => array('administer dbf_client entities'),
+    'file' => 'dbf_client.admin.inc',
+    'type' => MENU_LOCAL_ACTION,
+    'tab_parent' => 'clients',
+    'tab_root' => 'clients',
+    'weight' => 2,
+  );
+  $items['dbf_client/print_dbf_results'] = array(
+    'title' => 'Import DBF Clients results',
+    'page callback' => 'dbf_client_admin_import_dbf_print',
+    'access arguments' => array('administer dbf_client entities'),
+    'file' => 'dbf_client.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+  // *** END MENU OPTIONS FOR ENTITY ADMINISTRATION ***
+  
+  // *** MENU OPTIONS FOR ENTITY ***
+  $dbfclient_uri = 'dbf_client/%dbf_client';
+  $dbfclient_uri_argument_position = 1;
+
+  $items[$dbfclient_uri] = array(
+    'title callback' => 'entity_label',
+    'title arguments' => array('dbf_client', $dbfclient_uri_argument_position),
+    'page callback' => 'dbf_client_view',
+    'page arguments' => array($dbfclient_uri_argument_position),
+    'access callback' => 'dbf_client_custom_access',
+    'access arguments' => array('view', 'dbf_client', $dbfclient_uri_argument_position),
+    'file' => 'dbf_client.pages.inc',
+  );
+
+  $items[$dbfclient_uri . '/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items[$dbfclient_uri . '/delete'] = array(
+    'title' => 'Delete DBF Client Entity',
+    'title callback' => 'dbf_client_label',
+    'title arguments' => array($dbfclient_uri_argument_position),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dbf_client_delete_form', $dbfclient_uri_argument_position),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'dbf_client', $dbfclient_uri_argument_position),
+    'file' => 'dbf_client.admin.inc',
+  );
+
+  $items[$dbfclient_uri . '/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dbf_client_form', $dbfclient_uri_argument_position),
+    'access callback' => 'entity_access',
+    'access arguments' => array('edit', 'dbf_client', $dbfclient_uri_argument_position),
+    'file' => 'dbf_client.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
+  // *** END MENU OPTIONS FOR ENTITY ***
+
+  // *** MENU OPTIONS FOR ENTITY TYPES ***
+  foreach (dbf_client_types() as $type => $info) {
+    $items['dbf_client/add/' . $type] = array(
+      'title' => 'Add DBF Client Entity',
+      'page callback' => 'dbf_client_add',
+      'page arguments' => array(2),
+      'access callback' => 'entity_access',
+      'access arguments' => array('create', 'dbf_client', $type),
+      'file' => 'dbf_client.admin.inc',
+    );
+  }
+
+  $items['admin/structure/try_entity-types/%dbf_client_type/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dbf_client_type_form_delete_confirm', 4),
+    'access arguments' => array('administer dbf_client types'),
+    'weight' => 1,
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'dbf_client.admin.inc',
+  );
+  // *** MENU OPTIONS FOR ENTITY TYPES ***
+
+  return $items;
+}
+
+function dbf_client_custom_access($operation, $entity_type, $entity = NULL){
+  $have_access = FALSE;
+  $basic_access = entity_access($operation, $entity_type, $entity);
+  if($basic_access && $entity != NULL){
+    $have_access = TRUE;
+  }
+  return $have_access;
+}
+
+function dbf_client_form_user_profile_form_alter (&$form, &$form_state, $form_id) {
+  dpm($form);
+}
+
+function dbf_client_form_client_service_node_form_alter (&$form, &$form_state, $form_id) {
+  //drupal_add_js(drupal_get_path('module', 'dbf_client').'/js/dbfclient.autocomplete.js');
+  $form['field_servicio_cliente'][LANGUAGE_NONE][0]['value']['#autocomplete_path'] = 'dbf_client/autocomplete';
+  //$form['field_servicio_cliente'][LANGUAGE_NONE][0]['value']['#value_callback'] = 'dbf_client_autocomplete_value';
+  $form['field_servicio_cliente'][LANGUAGE_NONE][0]['value']['#ajax'] = array(
+    'callback' => 'dbf_client_autocomplete_ajax',
+    'wrapper' => 'autocomplete-response',
+    'event' => 'select',
+    'method' => 'replace',
+    'effect' => 'fade',
+  );
+  $selected_value = $form_state['node']->field_servicio_cliente[LANGUAGE_NONE][0]['value'];
+  $ajax_content = _dbf_client_generate_client_info_content($selected_value);
+  //$ajax_content = array();
+  $form['field_servicio_cliente'][LANGUAGE_NONE][0]['value']['#suffix'] = '<div id="autocomplete-response">' . render($ajax_content) . '</div>';
+}
+
+function _dbf_client_generate_client_info_content($selected_value) {
+  $content = array();
+  $client_info_array = entity_load('dbf_client', array($selected_value));
+  $client_info = (isset($client_info_array[$selected_value])) ? $client_info_array[$selected_value] : NULL;
+  $client_html = '';
+  if ($client_info != NULL) {
+    $client_html = '<ul id="client_info">';
+    if(!empty($client_info->CNOMCLI) && $client_info->CNOMCLI != '') $client_html .= '<li><label>' . t('Name') . '</label>' . $client_info->CNOMCLI . '</li>';
+    if(!empty($client_info->CNOMCOM) && $client_info->CNOMCOM != '') $client_html .= '<li><label>' . t('Comercial name') . '</label>' . $client_info->CNOMCOM . '</li>';
+    if(!empty($client_info->CDIRCLI) && $client_info->CDIRCLI != '') $client_html .= '<li><label>' . t('Address') . '</label>' . $client_info->CDIRCLI . '</li>';
+    if(!empty($client_info->CPOBCLI) && $client_info->CPOBCLI != '') $client_html .= '<li><label>' . t('City') . '</label>' . $client_info->CPOBCLI . '</li>';
+    if(!empty($client_info->CPTLCLI) && $client_info->CPTLCLI != '') $client_html .= '<li><label>' . t('Postal code') . '</label>' . $client_info->CPTLCLI . '</li>';
+    if(!empty($client_info->CDNICIF) && $client_info->CNOMCLI != '') $client_html .= '<li><label>' . t('DNI / CIF') . '</label>' . $client_info->CDNICIF . '</li>';
+    if(!empty($client_info->CTFO1CLI) && $client_info->CDNICIF != '') $client_html .= '<li><label>' . t('Phone 01') . '</label>' . $client_info->CTFO1CLI . '</li>';
+    if(!empty($client_info->CFAXCLI) && $client_info->CFAXCLI != '') $client_html .= '<li><label>' . t('Fax') . '</label>' . $client_info->CFAXCLI . '</li>';
+    if(!empty($client_info->CTFO2CLI) && $client_info->CTFO2CLI != '') $client_html .= '<li><label>' . t('Phone 02') . '</label>' . $client_info->CTFO2CLI . '</li>';
+    if(!empty($client_info->EMAIL) && $client_info->EMAIL != '') $client_html .= '<li><label>' . t('Email') . '</label>' . $client_info->EMAIL . '</li>';
+    if(!empty($client_info->CCODGRUP) && $client_info->CCODGRUP != '') $client_html .= '<li><label>' . t('Service code') . '</label>' . $client_info->CCODGRUP . '</li>';
+    $client_html .= '</ul>';
+  }
+  $content = array();
+  $content['client_info_content'] = array(
+    '#type' => 'markup',
+    '#markup' => $client_html,
+  );
+  return $content;
+}
+
+function dbf_client_autocomplete_ajax($form, &$form_state) {
+  // Retrieve client info from database (dbf_client Entity).
+  $selected_value = $form_state['values']['field_servicio_cliente'][LANGUAGE_NONE][0]['value'];
+  $ajax_content = _dbf_client_generate_client_info_content($selected_value);
+  $commands = array();  
+  $commands[] = ajax_command_html('#autocomplete-response', render($ajax_content));
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/*
+function dbf_client_form_alter (&$form, &$form_state, $form_id) {
+  dpm($form_id);
+}
+*/
+
+/**
+ * Implements hook_permission().
+ */
+function dbf_client_permission() {
+  $permissions = array(
+    'administer dbf_client entities' => array(
+      'title' => t('Administer DBF Client types'),
+      'description' => t('Allows users to configure DBF Client types and their fields.'),
+      'restrict access' => TRUE,
+    ),
+    'create dbf_client entities' => array(
+      'title' => t('Create DBF Client'),
+      'description' => t('Allows users to create DBF Client.'),
+      'restrict access' => TRUE,
+    ),
+    'view dbf_client entities' => array(
+      'title' => t('View DBF Client'),
+      'description' => t('Allows users to view galleries.'),
+      'restrict access' => TRUE,
+    ),
+    'edit any dbf_client entities' => array(
+      'title' => t('Edit any DBF Client'),
+      'description' => t('Allows users to edit any DBF Client.'),
+      'restrict access' => TRUE,
+    ),
+    'edit own dbf_client entities' => array(
+      'title' => t('Edit own DBF Client Entities'),
+      'description' => t('Allows users to edit own DBF Client Entities.'),
+      'restrict access' => TRUE,
+    ),
+  );
+
+  return $permissions;
+}
+
+/**
+ * JSON call for client autocomplete 
+ */
+function dbf_client_autocomplete_list($string = '') {
+  $matches = array();
+  $result = db_select('dbf_client')
+  ->fields('dbf_client', array('CCODCLI', 'CNOMCLI'))
+  ->condition('status', 1, '=')
+  ->condition('CNOMCLI', db_like($string) . '%', 'LIKE')
+  ->execute();
+  foreach ($result as $client) {
+    $matches[$client->CCODCLI] = check_plain($client->CNOMCLI);
+  }
+  drupal_json_output($matches);
+}
+
+/**
+ * Value callback for a dbf_client autocomplete element.
+ *
+ * Replace the entity CCODCLI with CNOMCLI.
+ */
+function dbf_client_autocomplete_value($element, $input = FALSE, $form_state) {
+  if ($input === FALSE) {
+    // We're building the displayed 'default value': expand the raw nid into
+    // "node title [nid:n]".
+    $client_id = $element['#default_value'];
+    if (!empty($client_id)) {
+      $q = db_select('dbf_client', 'dbf');
+      $dbf_alias = $q->addField('dbf', 'CNOMCLI');
+      //$q->addTag('node_access')
+      $q->condition('dbf.CCODCLI', $client_id);
+      $q->orderBy('CNOMCLI', 'ASC')->range(0, 1);
+      $result = $q->execute();
+      // @todo If no result (if doesn't exist or no access).
+      $value = $result->fetchField();
+      $value .= ' [Client id: ' . $client_id . ']';
+      return $value;
+    }
+  }
+}
+
+/**
+ * Implements hook_entity_property_info_alter().
+ */
+function dbf_client_entity_property_info_alter(&$info) {
+  $properties = &$info['dbf_client']['properties'];
+  $properties['created'] = array(
+    'label' => t("Date created"),
+    'type' => 'date',
+    'description' => t("The date the entity was posted."),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer dbf_client entities',
+    'schema field' => 'created',
+  );
+  $properties['changed'] = array(
+    'label' => t("Date changed"),
+    'type' => 'date',
+    'schema field' => 'changed',
+    'description' => t("The date the node was most recently updated."),
+  );
+  $properties['uid'] = array(
+    'label' => t("Author"),
+    'type' => 'user',
+    'description' => t("The author of the Entity."),
+    'setter callback' => 'entity_property_verbatim_set',
+    'setter permission' => 'administer dbf_client entities',
+    'required' => TRUE,
+    'schema field' => 'uid',
+  );
+}
+
+
+/*******************************************************************************
+ ****************************** DBF Client Entity API's *******************************
+ ******************************************************************************/
+
+/**
+ * Access callback for DBF Client Entity.
+ */
+function dbf_client_access($op, $dbfclient, $account = NULL, $entity_type = NULL) {
+  global $user;
+
+  if (!isset($account)) {
+    $account = $user;
+  }
+  switch ($op) {
+    case 'create':
+      return user_access('administer dbf_client entities', $account)
+          || user_access('create dbf_client entities', $account);
+    case 'view':
+      return user_access('administer dbf_client entities', $account)
+          || user_access('view dbf_client entities', $account);
+    case 'edit':
+      return user_access('administer dbf_client entities')
+          || user_access('edit any dbf_client entities')
+          || (user_access('edit own dbf_client entities') && ($dbfclient->uid == $account->uid));
+  }
+}
+
+/**
+ * Load a DBF Client Entity.
+ */
+function dbf_client_load($id, $reset = FALSE) {
+  $galleries = dbf_client_load_multiple(array($id), array(), $reset);
+  return reset($galleries);
+}
+
+/**
+ * Load multiple galleries based on certain conditions.
+ */
+function dbf_client_load_multiple($ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('dbf_client', $ids, $conditions, $reset);
+}
+
+/**
+ * Save Entity.
+ */
+function dbf_client_save($dbfclient) {
+  entity_save('dbf_client', $dbfclient);
+}
+
+/**
+ * Insert and update Entity. Method for pathauto implementation.
+ */
+ /*
+function dbf_client_insert($dbfclient) {
+  entity_save('dbf_client', $dbfclient);
+  module_load_include('inc', 'dbf_client', 'dbf_client.pathauto');
+  dbf_client_update_alias($entity, 'insert');
+}
+function dbf_client_update($dbfclient) {
+  entity_save('dbf_client', $dbfclient);
+  module_load_include('inc', 'dbf_client', 'dbf_client.pathauto');
+  dbf_client_update_alias($entity, 'update');
+}
+*/
+
+/**
+ * Publish Entity
+ */
+function dbf_client_publish_item($dbfclient) {
+  $dbfclient->status = 1;
+  dbf_client_save($dbfclient);
+}
+
+/**
+ * Unpublish Entity
+ */
+function dbf_client_unpublish_item($dbfclient) {
+  $dbfclient->status = 0;
+  dbf_client_save($dbfclient);
+}
+
+/**
+ * Delete single Entity.
+ */
+function dbf_client_delete($dbfclient) {
+  //Delete the entity
+  entity_delete('dbf_client', entity_id('dbf_client' ,$dbfclient));
+  //pathauto_entity_path_delete_all('dbf_client', $dbfclient, "dbf_client/{$dbfclient->CCODCLI}");
+}
+
+/**
+ * Delete multiple Entities.
+ */
+function dbf_client_delete_multiple($dbfclient_ids) {
+  entity_delete_multiple('dbf_client', $dbfclient_ids);
+}
+/**
+  * Implements hook_field_extra_fields()
+  */
+function dbf_client_field_extra_fields() {
+  $name_field_info = array(
+    'label' => t('Name'),
+    'description' => t('Entity name'),
+    'weight' => 0,
+  );
+  
+  $ccodcli_field_info = array(
+    'label' => t('Client code'),
+    'description' => t('Client code'),
+    'weight' => 1,
+  );
+  $cnomcli_field_info = array(
+    'label' => t('Client name'),
+    'description' => t('Client name'),
+    'weight' => 2,
+  );
+  $cnomcom_field_info = array(
+    'label' => t('Client comercial name'),
+    'description' => t('Client comercial name'),
+    'weight' => 3,
+  );
+  $cdircli_field_info = array(
+    'label' => t('Client address'),
+    'description' => t('Client address'),
+    'weight' => 4,
+  );
+  $cpobcli_field_info = array(
+    'label' => t('Client city'),
+    'description' => t('Client city'),
+    'weight' => 5,
+  );
+  $cptlcli_field_info = array(
+    'label' => t('Client postal code'),
+    'description' => t('Client postal code'),
+    'weight' => 6,
+  );
+  $cdnicif_field_info = array(
+    'label' => t('Client DNI, NIF or CIF'),
+    'description' => t('Client DNI, NIF or CIF'),
+    'weight' => 7,
+  );
+  $ctf01cli_field_info = array(
+    'label' => t('Client first phone number'),
+    'description' => t('Client first phone number'),
+    'weight' => 8,
+  );
+  $cfaxcli_field_info = array(
+    'label' => t('Client fax number'),
+    'description' => t('Client fax number'),
+    'weight' => 9,
+  );
+  $ctf02cli_field_info = array(
+    'label' => t('Client second phone number'),
+    'description' => t('Client second phone number'),
+    'weight' => 10,
+  );
+  $email_field_info = array(
+    'label' => t('Client email'),
+    'description' => t('Client email'),
+    'weight' => 11,
+  );
+  $ccodgrup_field_info = array(
+    'label' => t('Client service code'),
+    'description' => t('Client service code'),
+    'weight' => 12,
+  );
+  $form_elements = array();
+  $form_elements['name'] = $name_field_info;
+  $form_elements['CCODCLI'] = $ccodcli_field_info;
+  $form_elements['CNOMCLI'] = $cnomcli_field_info;
+  $form_elements['CNOMCOM'] = $cnomcom_field_info;
+  $form_elements['CDIRCLI'] = $cdircli_field_info;
+  $form_elements['CPOBCLI'] = $cpobcli_field_info;
+  $form_elements['CPTLCLI'] = $cptlcli_field_info;
+  $form_elements['CDNICIF'] = $cdnicif_field_info;
+  $form_elements['CTF01CLI'] = $ctf01cli_field_info;
+  $form_elements['CFAXCLI'] = $cfaxcli_field_info;
+  $form_elements['CTF02CLI'] = $ctf02cli_field_info;
+  $form_elements['EMAIL'] = $email_field_info;
+  $form_elements['CCODGRUP'] = $ccodgrup_field_info;
+  $display_elements = array();
+  $display_elements['name'] = $name_field_info;
+  $display_elements['CCODCLI'] = $ccodcli_field_info;
+  $display_elements['CNOMCLI'] = $cnomcli_field_info;
+  $display_elements['CNOMCOM'] = $cnomcom_field_info;
+  $display_elements['CDIRCLI'] = $cdircli_field_info;
+  $display_elements['CPOBCLI'] = $cpobcli_field_info;
+  $display_elements['CPTLCLI'] = $cptlcli_field_info;
+  $display_elements['CDNICIF'] = $cdnicif_field_info;
+  $display_elements['CTF01CLI'] = $ctf01cli_field_info;
+  $display_elements['CFAXCLI'] = $cfaxcli_field_info;
+  $display_elements['CTF02CLI'] = $ctf02cli_field_info;
+  $display_elements['EMAIL'] = $email_field_info;
+  $display_elements['CCODGRUP'] = $ccodgrup_field_info;
+  
+  $extra_fields['dbf_client']['client']['form'] = $form_elements; 
+  $extra_fields['dbf_client']['client']['display'] = $display_elements;
+  return $extra_fields;
+}
+
+/*******************************************************************************
+ ****************************** DBF Client Entity Type API's ********************************
+ ******************************************************************************/
+
+/**
+ * Access callback for DBF Client Entity Type.
+ */
+function dbf_client_type_access($op, $entity = NULL) {
+  return user_access('administer dbf_client types');
+}
+
+/**
+ * Load DBF Client Entity Type.
+ */
+function dbf_client_type_load($dbfclient_type) {
+  return dbf_client_types($dbfclient_type);
+}
+
+/**
+ * List of DBF Client Entity Types.
+ */
+function dbf_client_types($type_name = NULL) {
+  $types = entity_load_multiple_by_name('dbf_client_type', isset($type_name) ? array($type_name) : FALSE);
+  return isset($type_name) ? reset($types) : $types;
+}
+
+/**
+ * Save DBF Client Entity type entity.
+ */
+function dbf_client_type_save($dbfclient_type) {
+  entity_save('dbf_client_type', $dbfclient_type);
+}
+
+/**
+ * Delete single case type.
+ */
+function dbf_client_type_delete($dbfclient_type) {
+  entity_delete('dbf_client_type', entity_id('dbf_client_type' ,$dbfclient_type));
+  //Delete the entity fields (Not implemented)
+  $dbfclient_type_machine_name = $dbfclient_type->type;
+}
+
+/**
+ * Delete multiple case types.
+ */
+function dbf_client_type_delete_multiple($dbfclient_type_ids) {
+  entity_delete_multiple('dbf_client_type', $dbfclient_type_ids);
+}
+
+/**
+  * Implements hook_views_api().
+  */
+function dbf_client_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'dbf_client'),
+  );
+}
+/**
+* ENTITY THEME AND PREPROCESS FUNCTIONS 
+*/
+/**
+ * Implements hook_theme().
+ * Template functions definition and passed arguments.
+ */
+
+function dbf_client_theme($existing, $type, $theme, $path) {
+  $types = array_keys(entity_crud_get_info());
+  $pattern = '(' . implode('|', $types) . ')(\.|__)';
+  return array(
+    'dbf_client' => array(
+      'render element' => 'elements',
+      'template' => 'dbf_client',
+      'pattern' => $pattern,
+    ),
+  );
+}
+
+/**
+ * Preprocess the view info for dbf_client theme (dbf_client.tpl.php)
+ */
+function dbf_client_preprocess_entity(&$variables){
+  drupal_add_library('system', 'drupal.ajax');
+  $content = $variables['content'];
+  $dbf_client = $variables['elements']['#entity'];
+  $variables['content'] = $content;
+  drupal_add_css(drupal_get_path('module', 'dbf_client').'/css/dbfclient.css');
+  drupal_add_js(drupal_get_path('module', 'dbf_client').'/js/dbfclient.selection.js');
+  //dpm($variables);
+}
+
+/**
+* VIEWS SPECIAL OPERATIONS
+*/  
+/**
+ * Implementation of hook_action_info().
+ */
+function dbf_client_action_info() {
+  $action = array(
+    'dbf_client_delete_action' => array(
+      'label' => t('Delete DBF Client Entity'),
+      'type' => 'dbf_client',
+      'configurable' => FALSE,
+      'triggers' => array('any'),
+    ),
+    'dbf_client_publish_item_action' => array(
+      'label' => t('Publish DBF Client Entity'),
+      'type' => 'dbf_client',
+      'configurable' => FALSE,
+      'triggers' => array('any'),
+    ),
+    'dbf_client_unpublish_item_action' => array(
+      'label' => t('Unpublish DBF Client Entity'),
+      'type' => 'dbf_client',
+      'configurable' => FALSE,
+      'triggers' => array('any'),
+    ),
+ );
+ return $action;
+}
+
+/**
+ * Action function for dbf_client_delete.
+ */
+function dbf_client_delete_action(&$entity, $context = array()) {
+  //dpm($entity);
+  dbf_client_delete($entity);
+}
+/**
+ * Action function for dbf_client_publish_item.
+ */
+function dbf_client_publish_item_action(&$entity, $context = array()) {
+  //dpm($entity);
+  dbf_client_publish_item($entity);
+}
+/**
+ * Action function for dbf_client_unpublish_item.
+ */
+function dbf_client_unpublish_item_action(&$entity, $context = array()) {
+  //dpm($entity);
+  dbf_client_unpublish_item($entity);
+}

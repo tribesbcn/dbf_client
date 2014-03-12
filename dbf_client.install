@@ -1,0 +1,206 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function dbf_client_schema() {
+  $schema = array();
+
+  $schema['dbf_client'] = array(
+    'description' => 'The base table for clients.',
+    'fields' => array(
+      'CCODCLI' => array(
+        'description' => 'The client DBF primary key.',
+        'type' => 'varchar',
+        'length' => 6,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'type' => array(
+        'description' => 'The type (bundle) of this task.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'name' => array(
+        'description' => 'The entity name or title.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'CNOMCLI' => array(
+        'description' => 'The client name.',
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'CNOMCOM' => array(
+        'description' => 'The client comercial name.',
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'CDIRCLI' => array(
+        'description' => 'The client address.',
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CPOBCLI' => array(
+        'description' => 'The client city.',
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CPTLCLI' => array(
+        'description' => 'The client postal code.',
+        'type' => 'varchar',
+        'length' => 10,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CDNICIF' => array(
+        'description' => 'The client DNI, NIF or CIF.',
+        'type' => 'varchar',
+        'length' => 15,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CTFO1CLI' => array(
+        'description' => 'The client first phone number.',
+        'type' => 'varchar',
+        'length' => 17,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CFAXCLI' => array(
+        'description' => 'The client fax number.',
+        'type' => 'varchar',
+        'length' => 17,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CTFO2CLI' => array(
+        'description' => 'The client second phone number.',
+        'type' => 'varchar',
+        'length' => 17,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'EMAIL' => array(
+        'description' => 'The client email.',
+        'type' => 'varchar',
+        'length' => 120,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'CCODGRUP' => array(
+        'description' => 'The client service code.',
+        'type' => 'varchar',
+        'length' => 6,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+
+      'uid' => array(
+        'description' => 'ID of Drupal user creator.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the client was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the client was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'status' => array(
+        'description' => 'The entity publish state.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 1,
+      ),
+    ),
+    'primary key' => array('CCODCLI'),
+  );
+
+  $schema['dbf_client_type'] = array(
+    'description' => 'Stores information about all defined DBF Client entity types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique task type ID.',
+      ),
+      'type' => array(
+        'description' => 'The machine-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'description' => array(
+        'description' => 'A brief description of this type.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+        'translatable' => TRUE,
+      ),
+    ) + entity_exportable_schema_fields(),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  return $schema;
+}
+/**
+* Implements hook_install()
+*/
+function dbf_client_install() {
+  //Creates the entity type (Client)
+  $dbfclient_type = (object)array(
+    'type' => 'client',
+    'label' => t('Client'),
+    'description' => 'A DBF client base entity.',
+    'is_new' => TRUE,
+  );
+  entity_save('dbf_client_type', $dbfclient_type);
+}
+
+/**
+* Implements hook_uninstall()
+*/
+function dbf_client_uninstall(){
+  variable_del('import_dbf_results');
+}
+
+/**
+* Implements hook_disable()
+*/
+function dbf_client_disable(){
+  //Delete all the DBF Client items and its fields.
+  $all_dbf_client = entity_load('dbf_client');
+  foreach($all_dbf_client as $entity_item){
+    entity_delete('dbf_client', entity_id('dbf_client', $entity_item));
+  }
+}
+
