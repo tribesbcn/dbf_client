@@ -216,15 +216,11 @@ function dbf_client_custom_access($operation, $entity_type, $entity = NULL){
   return $have_access;
 }
 
-function dbf_client_form_user_profile_form_alter (&$form, &$form_state, $form_id) {
-  //dpm($form);
-}
-
-function dbf_client_form_client_service_node_form_alter (&$form, &$form_state, $form_id) {
+function dbf_client_field_service_client_changes($form, $form_state, $field_name = 'field_service_client') {
   //drupal_add_js(drupal_get_path('module', 'dbf_client').'/js/dbfclient.autocomplete.js');
-  $form['field_service_client'][LANGUAGE_NONE][0]['value']['#autocomplete_path'] = 'dbf_client/autocomplete';
-  //$form['field_service_client'][LANGUAGE_NONE][0]['value']['#value_callback'] = 'dbf_client_autocomplete_value';
-  $form['field_service_client'][LANGUAGE_NONE][0]['value']['#ajax'] = array(
+  $form[$field_name][LANGUAGE_NONE][0]['value']['#autocomplete_path'] = 'dbf_client/autocomplete';
+  //$form[$field_name][LANGUAGE_NONE][0]['value']['#value_callback'] = 'dbf_client_autocomplete_value';
+  $form[$field_name][LANGUAGE_NONE][0]['value']['#ajax'] = array(
     'callback' => 'dbf_client_autocomplete_ajax',
     'wrapper' => 'autocomplete-response',
     'event' => 'select',
@@ -234,7 +230,12 @@ function dbf_client_form_client_service_node_form_alter (&$form, &$form_state, $
   $selected_value = $form_state['node']->field_service_client[LANGUAGE_NONE][0]['value'];
   $ajax_content = _dbf_client_generate_client_info_content($selected_value);
   //$ajax_content = array();
-  $form['field_service_client'][LANGUAGE_NONE][0]['value']['#suffix'] = '<div id="autocomplete-response">' . render($ajax_content) . '</div>';
+  $form[$field_name][LANGUAGE_NONE][0]['value']['#suffix'] = '<div id="autocomplete-response">' . render($ajax_content) . '</div>';
+  return $form[$field_name];
+}
+
+function dbf_client_form_user_profile_form_alter (&$form, &$form_state, $form_id) {
+  $form['field_user_client_dbf_code'] = dbf_client_field_service_client_changes($form, $form_state, 'field_user_client_dbf_code');
 }
 
 function _dbf_client_generate_client_info_content($selected_value) {
