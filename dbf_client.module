@@ -228,7 +228,7 @@ function dbf_client_field_service_client_changes($form, $form_state, $field_name
     'effect' => 'fade',
   );
   $selected_value = $form_state['node']->field_service_client[LANGUAGE_NONE][0]['value'];
-  $ajax_content = _dbf_client_generate_client_info_content($selected_value);
+  $ajax_content = dbf_client_generate_client_info_content($selected_value);
   //$ajax_content = array();
   $form[$field_name][LANGUAGE_NONE][0]['value']['#suffix'] = '<div id="autocomplete-response">' . render($ajax_content) . '</div>';
   return $form[$field_name];
@@ -238,7 +238,7 @@ function dbf_client_form_user_profile_form_alter (&$form, &$form_state, $form_id
   $form['field_user_client_dbf_code'] = dbf_client_field_service_client_changes($form, $form_state, 'field_user_client_dbf_code');
 }
 
-function _dbf_client_generate_client_info_content($selected_value) {
+function dbf_client_generate_client_info_content($selected_value) {
   $content = array();
   $client_info_array = ($selected_value) ? entity_load('dbf_client', array($selected_value)) : NULL;
   $client_info = (isset($client_info_array[$selected_value])) ? $client_info_array[$selected_value] : NULL;
@@ -269,7 +269,7 @@ function _dbf_client_generate_client_info_content($selected_value) {
 function dbf_client_autocomplete_ajax($form, &$form_state) {
   // Retrieve client info from database (dbf_client Entity).
   $selected_value = $form_state['values']['field_service_client'][LANGUAGE_NONE][0]['value'];
-  $ajax_content = _dbf_client_generate_client_info_content($selected_value);
+  $ajax_content = dbf_client_generate_client_info_content($selected_value);
   $commands = array();  
   $commands[] = ajax_command_html('#autocomplete-response', render($ajax_content));
   return array('#type' => 'ajax', '#commands' => $commands);
