@@ -1,0 +1,11 @@
+#client_info {
+  width: 600px;
+  border: 1px solid #CCC;
+}
+#client_info ul {
+  list-style:none;
+}
+#client_info label {
+  width: 150px;
+  display: inline-block;
+}
