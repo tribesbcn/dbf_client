@@ -681,5 +681,5 @@ function dbf_client_delete_form_submit($form, &$form_state) {
   dbf_client_delete($dbfclient);
   drupal_set_message(t('DBF Client %name deleted.', array('%name' => entity_label('dbf_client', $dbfclient))));
 
-  $form_state['redirect'] = 'clients';
+  $form_state['redirect'] = 'admin/clients';
 }

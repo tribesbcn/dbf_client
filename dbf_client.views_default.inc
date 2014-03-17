@@ -8,7 +8,7 @@ function dbf_client_views_default_views() {
   
   $view = new view();
   $view->name = 'clients';
-  $view->description = '';
+  $view->description = 'Vista de administración de clientes de VLT.';
   $view->tag = 'default';
   $view->base_table = 'dbf_client';
   $view->human_name = 'Clients';
@@ -227,7 +227,7 @@ function dbf_client_views_default_views() {
   
   /* Display: Page */
   $handler = $view->new_display('page', 'Page', 'page');
-  $handler->display->display_options['path'] = 'clients';
+  $handler->display->display_options['path'] = 'admin/clients';
   $handler->display->display_options['menu']['type'] = 'normal';
   $handler->display->display_options['menu']['title'] = 'Clients administration';
   $handler->display->display_options['menu']['weight'] = '0';
@@ -266,6 +266,7 @@ function dbf_client_views_default_views() {
     t('Delete'),
     t('Page'),
   );
+    
   
   $views['clients'] = $view;
   

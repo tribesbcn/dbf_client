@@ -114,8 +114,8 @@ function dbf_client_menu() {
     'access arguments' => array('administer dbf_client entities'),
     'file' => 'dbf_client.admin.inc',
     'type' => MENU_LOCAL_ACTION,
-    'tab_parent' => 'clients',
-    'tab_root' => 'clients',
+    'tab_parent' => 'admin/clients',
+    'tab_root' => 'admin/clients',
     'weight' => 1,
   );
   $items['dbf_client/import_dbf'] = array(
@@ -125,8 +125,8 @@ function dbf_client_menu() {
     'access arguments' => array('administer dbf_client entities'),
     'file' => 'dbf_client.admin.inc',
     'type' => MENU_LOCAL_ACTION,
-    'tab_parent' => 'clients',
-    'tab_root' => 'clients',
+    'tab_parent' => 'admin/clients',
+    'tab_root' => 'admin/clients',
     'weight' => 2,
   );
   $items['dbf_client/print_dbf_results'] = array(
@@ -240,11 +240,12 @@ function dbf_client_form_user_profile_form_alter (&$form, &$form_state, $form_id
 
 function dbf_client_generate_client_info_content($selected_value) {
   $content = array();
+  drupal_add_css(drupal_get_path('module', 'dbf_client') . '/css/client_info.css');
   $client_info_array = ($selected_value) ? entity_load('dbf_client', array($selected_value)) : NULL;
   $client_info = (isset($client_info_array[$selected_value])) ? $client_info_array[$selected_value] : NULL;
   $client_html = '';
   if ($client_info != NULL) {
-    $client_html = '<ul id="client_info">';
+    $client_html = '<div id="client_info"><ul>';
     if(!empty($client_info->CNOMCLI) && $client_info->CNOMCLI != '') $client_html .= '<li><label>' . t('Name') . '</label>' . $client_info->CNOMCLI . '</li>';
     if(!empty($client_info->CNOMCOM) && $client_info->CNOMCOM != '') $client_html .= '<li><label>' . t('Comercial name') . '</label>' . $client_info->CNOMCOM . '</li>';
     if(!empty($client_info->CDIRCLI) && $client_info->CDIRCLI != '') $client_html .= '<li><label>' . t('Address') . '</label>' . $client_info->CDIRCLI . '</li>';
@@ -256,7 +257,7 @@ function dbf_client_generate_client_info_content($selected_value) {
     if(!empty($client_info->CTFO2CLI) && $client_info->CTFO2CLI != '') $client_html .= '<li><label>' . t('Phone 02') . '</label>' . $client_info->CTFO2CLI . '</li>';
     if(!empty($client_info->EMAIL) && $client_info->EMAIL != '') $client_html .= '<li><label>' . t('Email') . '</label>' . $client_info->EMAIL . '</li>';
     if(!empty($client_info->CCODGRUP) && $client_info->CCODGRUP != '') $client_html .= '<li><label>' . t('Service code') . '</label>' . $client_info->CCODGRUP . '</li>';
-    $client_html .= '</ul>';
+    $client_html .= '</ul></div>';
   }
   $content = array();
   $content['client_info_content'] = array(
