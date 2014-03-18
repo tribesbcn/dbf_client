@@ -103,7 +103,7 @@ function dbf_client_menu() {
   $items['dbf_client/autocomplete'] = array(
     'title' => 'DBF Client autocomplete',
     'page callback' => 'dbf_client_autocomplete_list',
-    'access arguments' => array('administer dbf_client entities'),
+    'access arguments' => array('view dbf_client entities'),
     'type' => MENU_CALLBACK,
   );
   
